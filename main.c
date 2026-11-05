@@ -6,28 +6,46 @@
 #define USER_FILE "users.dat"
 #define TEMP_FILE "users_temp.dat"
 
+/* FUNCTION DECLARATIONS */
+
+void readLine(char text[], int size);
 void displayMenu();
+
 void registerUser();
 void loginUser();
 void changePassword();
 
 int usernameExists(char username[]);
 int authenticateUser(char username[], char password[]);
-unsigned long long educationalHash(char password[]);
 int validPassword(char password[]);
-void readLine(char text[], int size);
+
+unsigned long long educationalHash(char password[]);
 
 /* INPUT FUNCTION */
 
 void readLine(char text[], int size)
 {
+    int ch;
+
     if (fgets(text, size, stdin) != NULL)
     {
+        if (strchr(text, '\n') == NULL)
+        {
+            while ((ch = getchar()) != '\n' && ch != EOF)
+            {
+                /* Clear remaining input */
+            }
+        }
+
         text[strcspn(text, "\n")] = '\0';
+    }
+    else
+    {
+        text[0] = '\0';
     }
 }
 
-/* PASSWORD HASH FUNCTION */
+/* EDUCATIONAL PASSWORD HASH */
 
 unsigned long long educationalHash(char password[])
 {
@@ -47,7 +65,9 @@ unsigned long long educationalHash(char password[])
 
 int validPassword(char password[])
 {
-    int upper = 0, lower = 0, digit = 0;
+    int upper = 0;
+    int lower = 0;
+    int digit = 0;
     int i;
 
     if (strlen(password) < 8)
@@ -68,7 +88,7 @@ int validPassword(char password[])
     return upper && lower && digit;
 }
 
-/* CHECK EXISTING USERNAME */
+/* CHECK DUPLICATE USERNAME */
 
 int usernameExists(char username[])
 {
@@ -92,6 +112,7 @@ int usernameExists(char username[])
     }
 
     fclose(fp);
+
     return 0;
 }
 
@@ -103,8 +124,8 @@ void registerUser()
     char password[64];
     char confirmPassword[64];
 
-    FILE *fp;
     unsigned long long hash;
+    FILE *fp;
 
     printf("\n========== USER REGISTRATION ==========\n");
 
@@ -114,13 +135,13 @@ void registerUser()
     if (strlen(username) == 0 ||
         strchr(username, '|') != NULL)
     {
-        printf("Invalid username!\n");
+        printf("\nInvalid username!\n");
         return;
     }
 
     if (usernameExists(username))
     {
-        printf("Username already exists!\n");
+        printf("\nUSERNAME ALREADY EXISTS!\n");
         return;
     }
 
@@ -129,9 +150,12 @@ void registerUser()
 
     if (!validPassword(password))
     {
-        printf("\nWeak password!\n");
-        printf("Minimum 8 characters required.\n");
-        printf("Use uppercase, lowercase and digits.\n");
+        printf("\nWEAK PASSWORD!\n");
+        printf("Password must contain:\n");
+        printf("- Minimum 8 characters\n");
+        printf("- At least one uppercase letter\n");
+        printf("- At least one lowercase letter\n");
+        printf("- At least one digit\n");
         return;
     }
 
@@ -140,7 +164,7 @@ void registerUser()
 
     if (strcmp(password, confirmPassword) != 0)
     {
-        printf("Passwords do not match!\n");
+        printf("\nPASSWORDS DO NOT MATCH!\n");
         return;
     }
 
@@ -150,11 +174,16 @@ void registerUser()
 
     if (fp == NULL)
     {
-        printf("Error opening user database!\n");
+        printf("\nUnable to open user database!\n");
         return;
     }
 
-    fprintf(fp, "%s|%llu\n", username, hash);
+    if (fprintf(fp, "%s|%llu\n", username, hash) < 0)
+    {
+        printf("\nError saving user record!\n");
+        fclose(fp);
+        return;
+    }
 
     fclose(fp);
 
@@ -167,7 +196,9 @@ void registerUser()
 int authenticateUser(char username[], char password[])
 {
     FILE *fp;
+
     char storedUsername[64];
+
     unsigned long long storedHash;
     unsigned long long enteredHash;
 
@@ -190,6 +221,7 @@ int authenticateUser(char username[], char password[])
     }
 
     fclose(fp);
+
     return 0;
 }
 
@@ -229,11 +261,15 @@ void changePassword()
     char confirmPassword[64];
 
     char storedUsername[64];
+
     unsigned long long storedHash;
     unsigned long long newHash;
 
-    FILE *fp, *temp;
+    FILE *fp;
+    FILE *temp;
+
     int found = 0;
+    int writeError = 0;
 
     printf("\n========== PASSWORD CHANGE ==========\n");
 
@@ -243,14 +279,18 @@ void changePassword()
     printf("Enter current password: ");
     readLine(oldPassword, sizeof(oldPassword));
 
+    /* VERIFY CURRENT PASSWORD */
+
     if (!authenticateUser(username, oldPassword))
     {
         printf("\nAUTHENTICATION FAILED!\n");
-        printf("Invalid username or password.\n");
+        printf("Incorrect username or current password.\n");
         return;
     }
 
-    printf("\nCurrent password verified!\n");
+    printf("\nCURRENT PASSWORD VERIFIED!\n");
+
+    /* GET NEW PASSWORD */
 
     printf("Enter new password: ");
     readLine(newPassword, sizeof(newPassword));
@@ -263,11 +303,15 @@ void changePassword()
         return;
     }
 
+    /* CHECK SAME PASSWORD */
+
     if (strcmp(oldPassword, newPassword) == 0)
     {
-        printf("\nNew password must be different!\n");
+        printf("\nNEW PASSWORD MUST BE DIFFERENT!\n");
         return;
     }
+
+    /* CONFIRM NEW PASSWORD */
 
     printf("Confirm new password: ");
     readLine(confirmPassword, sizeof(confirmPassword));
@@ -278,66 +322,90 @@ void changePassword()
         return;
     }
 
+    /* OPEN ORIGINAL DATABASE */
+
     fp = fopen(USER_FILE, "r");
 
     if (fp == NULL)
     {
-        printf("Unable to open user database!\n");
+        printf("\nUnable to open user database!\n");
         return;
     }
+
+    /* CREATE TEMPORARY DATABASE */
 
     temp = fopen(TEMP_FILE, "w");
 
     if (temp == NULL)
     {
         fclose(fp);
-        printf("Unable to create temporary file!\n");
+        printf("\nUnable to create temporary file!\n");
         return;
     }
 
     newHash = educationalHash(newPassword);
+
+    /* UPDATE SELECTED USER RECORD */
 
     while (fscanf(fp, " %63[^|]|%llu",
                   storedUsername, &storedHash) == 2)
     {
         if (strcmp(username, storedUsername) == 0)
         {
-            fprintf(temp, "%s|%llu\n",
-                    storedUsername, newHash);
+            if (fprintf(temp, "%s|%llu\n",
+                        storedUsername, newHash) < 0)
+            {
+                writeError = 1;
+                break;
+            }
+
             found = 1;
         }
         else
         {
-            fprintf(temp, "%s|%llu\n",
-                    storedUsername, storedHash);
+            if (fprintf(temp, "%s|%llu\n",
+                        storedUsername, storedHash) < 0)
+            {
+                writeError = 1;
+                break;
+            }
         }
     }
 
+    if (ferror(fp))
+        writeError = 1;
+
     fclose(fp);
-    fclose(temp);
 
-    if (!found)
+    if (fclose(temp) != 0)
+        writeError = 1;
+
+    if (!found || writeError)
     {
         remove(TEMP_FILE);
-        printf("\nUser account not found!\n");
+
+        if (writeError)
+            printf("\nDatabase writing error!\n");
+        else
+            printf("\nUSER ACCOUNT NOT FOUND!\n");
+
         return;
     }
 
-    if (remove(USER_FILE) != 0)
-    {
-        printf("Unable to update database!\n");
-        remove(TEMP_FILE);
-        return;
-    }
+    /* REPLACE DATABASE WITH UPDATED FILE */
 
     if (rename(TEMP_FILE, USER_FILE) != 0)
     {
-        printf("Database update failed!\n");
-        printf("Restore users.dat from your backup if necessary.\n");
+        printf("\nDATABASE UPDATE FAILED!\n");
+        printf("Original database has been retained.\n");
+        remove(TEMP_FILE);
         return;
     }
 
-    printf("\nPASSWORD CHANGED SUCCESSFULLY!\n");
+    printf("\n========================================\n");
+    printf("   PASSWORD CHANGED SUCCESSFULLY!\n");
+    printf("========================================\n");
+
     printf("Your new password has been saved.\n");
 }
 
@@ -366,6 +434,7 @@ void displayMenu()
 int main()
 {
     char input[20];
+    char extra;
     int choice;
 
     printf("\n****************************************\n");
@@ -377,11 +446,12 @@ int main()
     do
     {
         displayMenu();
+
         readLine(input, sizeof(input));
 
-        if (sscanf(input, "%d", &choice) != 1)
+        if (sscanf(input, "%d %c", &choice, &extra) != 1)
         {
-            printf("Invalid input! Enter a number.\n");
+            printf("\nINVALID INPUT! ENTER A NUMBER.\n");
             choice = 0;
             continue;
         }
@@ -401,24 +471,24 @@ int main()
                 break;
 
             case 4:
-                printf("\nAccount recovery module coming soon!\n");
+                printf("\nACCOUNT RECOVERY MODULE COMING SOON!\n");
                 break;
 
             case 5:
-                printf("\nLogin monitoring module coming soon!\n");
+                printf("\nLOGIN MONITORING MODULE COMING SOON!\n");
                 break;
 
             case 6:
-                printf("\nActivity reports module coming soon!\n");
+                printf("\nACTIVITY REPORTS MODULE COMING SOON!\n");
                 break;
 
             case 7:
-                printf("\nThank you for using Password Vault!\n");
+                printf("\nTHANK YOU FOR USING PASSWORD VAULT!\n");
                 printf("Exiting system...\n");
                 break;
 
             default:
-                printf("\nInvalid choice! Try again.\n");
+                printf("\nINVALID CHOICE! TRY AGAIN.\n");
         }
 
     } while (choice != 7);
