@@ -112,7 +112,6 @@ int usernameExists(char username[])
     }
 
     fclose(fp);
-
     return 0;
 }
 
@@ -189,6 +188,7 @@ void registerUser()
 
     printf("\nREGISTRATION SUCCESSFUL!\n");
     printf("Your account has been created.\n");
+    printf("Welcome to Password Vault!\n");
 }
 
 /* MODULE 02: LOGIN AUTHENTICATION */
@@ -221,7 +221,6 @@ int authenticateUser(char username[], char password[])
     }
 
     fclose(fp);
-
     return 0;
 }
 
@@ -385,14 +384,14 @@ void changePassword()
         remove(TEMP_FILE);
 
         if (writeError)
-            printf("\nDatabase writing error!\n");
+            printf("\nDATABASE WRITING ERROR!\n");
         else
             printf("\nUSER ACCOUNT NOT FOUND!\n");
 
         return;
     }
 
-    /* REPLACE DATABASE WITH UPDATED FILE */
+    /* REPLACE ORIGINAL DATABASE */
 
     if (rename(TEMP_FILE, USER_FILE) != 0)
     {
