@@ -6,7 +6,9 @@
 
 void displayMenu();
 void registerUser();
+void loginUser();
 int usernameExists(char username[]);
+int authenticateUser(char username[], char password[]);
 unsigned long long educationalHash(char password[]);
 int validPassword(char password[]);
 void readLine(char text[], int size);
@@ -67,7 +69,7 @@ int usernameExists(char username[])
     if (fp == NULL)
         return 0;
 
-    while (fscanf(fp, "%63[^|]|%llu\n",
+    while (fscanf(fp, "%63[^|]|%llu",
                   storedUsername, &storedHash) == 2)
     {
         if (strcmp(username, storedUsername) == 0)
@@ -80,6 +82,8 @@ int usernameExists(char username[])
     fclose(fp);
     return 0;
 }
+
+/* MODULE 01: USER REGISTRATION */
 
 void registerUser()
 {
@@ -114,11 +118,8 @@ void registerUser()
     if (!validPassword(password))
     {
         printf("\nWeak password!\n");
-        printf("Password must contain:\n");
-        printf("- Minimum 8 characters\n");
-        printf("- At least one uppercase letter\n");
-        printf("- At least one lowercase letter\n");
-        printf("- At least one digit\n");
+        printf("Minimum 8 characters required.\n");
+        printf("Use uppercase, lowercase and digits.\n");
         return;
     }
 
@@ -147,8 +148,66 @@ void registerUser()
 
     printf("\nRegistration successful!\n");
     printf("Your account has been created.\n");
-    printf("Welcome to Password Vault!\n");
 }
+
+/* MODULE 02: LOGIN AUTHENTICATION */
+
+int authenticateUser(char username[], char password[])
+{
+    FILE *fp;
+    char storedUsername[64];
+    unsigned long long storedHash;
+    unsigned long long enteredHash;
+
+    fp = fopen(USER_FILE, "r");
+
+    if (fp == NULL)
+        return 0;
+
+    enteredHash = educationalHash(password);
+
+    while (fscanf(fp, " %63[^|]|%llu",
+                  storedUsername, &storedHash) == 2)
+    {
+        if (strcmp(username, storedUsername) == 0 &&
+            enteredHash == storedHash)
+        {
+            fclose(fp);
+            return 1;
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+void loginUser()
+{
+    char username[64];
+    char password[64];
+
+    printf("\n========== LOGIN AUTHENTICATION ==========\n");
+
+    printf("Enter username: ");
+    readLine(username, sizeof(username));
+
+    printf("Enter password: ");
+    readLine(password, sizeof(password));
+
+    if (authenticateUser(username, password))
+    {
+        printf("\nLOGIN SUCCESSFUL!\n");
+        printf("Welcome, %s!\n", username);
+        printf("Access granted to Password Vault.\n");
+    }
+    else
+    {
+        printf("\nLOGIN FAILED!\n");
+        printf("Invalid username or password.\n");
+    }
+}
+
+/* MAIN MENU */
 
 void displayMenu()
 {
@@ -196,7 +255,7 @@ int main()
                 break;
 
             case 2:
-                printf("\nLogin module coming soon!\n");
+                loginUser();
                 break;
 
             case 3:
@@ -217,10 +276,11 @@ int main()
 
             case 7:
                 printf("\nThank you for using Password Vault!\n");
+                printf("Exiting system...\n");
                 break;
 
             default:
-                printf("Invalid choice! Try again.\n");
+                printf("\nInvalid choice! Try again.\n");
         }
 
     } while (choice != 7);
